@@ -1,0 +1,126 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#141311">
+<title>Оригинал</title>
+<style>
+:root{--bg:#f2efe9;--surface:#e6e1d8;--ink:#1d1b19;--mute:#6f6a62;--acc:#2b3dff;--accInk:#fff}
+@media (prefers-color-scheme:dark){:root{--bg:#141311;--surface:#23211e;--ink:#f1ede6;--mute:#9a948a;--acc:#7d8bff;--accInk:#10122e}}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:"Trebuchet MS","Segoe UI",system-ui,sans-serif;min-height:100vh;padding:env(safe-area-inset-top,0px) 0 120px}
+header{padding:20px 18px 8px}
+h1{margin:0 0 12px;font-size:26px;letter-spacing:-.5px}
+input[type=search]{width:100%;padding:13px 16px;border-radius:14px;border:0;background:var(--surface);color:var(--ink);font-size:16px}
+.tog{display:flex;align-items:center;justify-content:space-between;margin:14px 0 4px;font-size:15px}
+.sw{position:relative;width:48px;height:28px;border-radius:14px;background:var(--surface);border:0;cursor:pointer}
+.sw::after{content:"";position:absolute;top:3px;left:3px;width:22px;height:22px;border-radius:50%;background:var(--mute);transition:transform .2s}
+.sw[aria-pressed=true]{background:var(--acc)}
+.sw[aria-pressed=true]::after{transform:translateX(20px);background:var(--accInk)}
+ul{list-style:none;margin:0;padding:6px 10px}
+li{display:flex;align-items:center;gap:12px;padding:10px 8px;border-radius:14px;cursor:pointer}
+li.on{background:var(--surface)}
+.cov{width:50px;height:50px;border-radius:10px;flex:none;background:var(--surface) center/cover}
+.t{flex:1;min-width:0}
+.t b{display:block;font-size:16px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.t span{font-size:13px;color:var(--mute);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;display:block}
+.e{display:inline!important;font-size:12px;font-weight:700;background:var(--ink);color:var(--bg)!important;border-radius:4px;padding:1px 6px}
+.empty{padding:30px 18px;color:var(--mute);text-align:center}
+.mini{position:fixed;left:10px;right:10px;bottom:calc(10px + env(safe-area-inset-bottom,0px));background:var(--ink);color:var(--bg);border-radius:20px;padding:10px 14px 14px;display:none;align-items:center;gap:10px}
+.mini.show{display:flex}
+.mini .cov{width:44px;height:44px}
+.mini .t span{color:inherit;opacity:.7}
+.mini button{background:none;border:0;color:inherit;font-size:22px;cursor:pointer;padding:6px}
+.bar{position:absolute;left:16px;right:16px;bottom:5px;height:12px;cursor:pointer}
+.bar::before{content:"";position:absolute;left:0;right:0;top:4px;height:3px;border-radius:2px;background:rgba(127,127,127,.35)}
+.bar i{position:absolute;left:0;top:4px;height:3px;width:0;border-radius:2px;background:var(--acc)}
+.note{margin:10px 18px;font-size:13px;color:var(--mute)}
+</style>
+</head>
+<body>
+<header>
+<h1>Оригинал</h1>
+<input id="q" type="search" placeholder="Поиск треков и исполнителей" value="рэп">
+<div class="tog"><span>Только без цензуры</span><button class="sw" id="sw" aria-pressed="true" aria-label="Только без цензуры"></button></div>
+</header>
+<ul id="list"></ul>
+<p class="note">Играют 30-секундные отрывки из открытого каталога Apple.</p>
+<div class="mini" id="mini">
+<div class="cov" id="mc"></div>
+<div class="t"><b id="mt"></b><span id="ma"></span></div>
+<button id="pv" aria-label="Предыдущий">⏮</button>
+<button id="pp" aria-label="Пауза">⏸</button>
+<button id="nx" aria-label="Следующий">⏭</button>
+<div class="bar" id="bar"><i id="pr"></i></div>
+</div>
+<audio id="au"></audio>
+<script>
+var $=function(i){return document.getElementById(i)};
+var au=$("au"),all=[],cur=-1,only=true,timer=null,seq=0;
+
+function shown(){return all.filter(function(t){return !only||t.trackExplicitness==="explicit"})}
+
+function draw(){
+  var l=$("list"),v=shown();l.innerHTML="";
+  if(!v.length){var d=document.createElement("div");d.className="empty";
+    d.textContent=all.length?"Нет треков без цензуры. Выключи фильтр или поищи другое.":"Ничего не найдено";l.appendChild(d);return}
+  v.forEach(function(t){
+    var li=document.createElement("li");if(cur>=0&&all[cur]===t)li.className="on";
+    var c=document.createElement("div");c.className="cov";c.style.backgroundImage="url("+t.artworkUrl100+")";
+    var w=document.createElement("div");w.className="t";
+    var b=document.createElement("b");b.textContent=t.trackName;
+    var s=document.createElement("span");
+    if(t.trackExplicitness==="explicit"){var e=document.createElement("span");e.className="e";e.textContent="E";s.appendChild(e);s.appendChild(document.createTextNode(" "))}
+    s.appendChild(document.createTextNode(t.artistName));
+    w.appendChild(b);w.appendChild(s);li.appendChild(c);li.appendChild(w);
+    li.onclick=function(){start(all.indexOf(t))};
+    l.appendChild(li)});
+}
+
+function start(i){
+  cur=i;var t=all[i];
+  au.src=t.previewUrl;au.play();
+  $("mini").className="mini show";
+  $("mc").style.backgroundImage="url("+t.artworkUrl100+")";
+  $("mt").textContent=t.trackName;$("ma").textContent=t.artistName;
+  draw();
+}
+
+function step(d){
+  var v=shown();if(!v.length)return;
+  var k=cur>=0?v.indexOf(all[cur]):-1;
+  start(all.indexOf(v[(k+d+v.length)%v.length]));
+}
+
+function search(){
+  var term=$("q").value.trim();if(!term)return;
+  var n=++seq;
+  $("list").innerHTML='<div class="empty">Ищу…</div>';
+  fetch("https://itunes.apple.com/search?media=music&entity=song&limit=50&country=RU&term="+encodeURIComponent(term))
+    .then(function(r){return r.json()})
+    .then(function(j){
+      if(n!==seq)return;
+      all=(j.results||[]).filter(function(t){return t.previewUrl});
+      cur=-1;draw();
+    })
+    .catch(function(){
+      if(n!==seq)return;
+      $("list").innerHTML='<div class="empty">Не получилось загрузить. Проверь интернет и попробуй ещё раз.</div>';
+    });
+}
+
+$("q").oninput=function(){clearTimeout(timer);timer=setTimeout(search,450)};
+$("sw").onclick=function(){only=!only;this.setAttribute("aria-pressed",only);draw()};
+$("pp").onclick=function(){au.paused?au.play():au.pause()};
+$("nx").onclick=function(){step(1)};
+$("pv").onclick=function(){step(-1)};
+au.onplay=function(){$("pp").textContent="⏸"};
+au.onpause=function(){$("pp").textContent="▶"};
+au.onended=function(){step(1)};
+au.ontimeupdate=function(){if(au.duration)$("pr").style.width=(au.currentTime/au.duration*100)+"%"};
+$("bar").onclick=function(e){var r=this.getBoundingClientRect();if(au.duration)au.currentTime=au.duration*(e.clientX-r.left)/r.width};
+search();
+</script>
+</body>
+</html>
