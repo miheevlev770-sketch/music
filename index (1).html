@@ -1,0 +1,192 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#141311">
+<title>Оригинал</title>
+<style>
+:root{--bg:#f2efe9;--surface:#e6e1d8;--ink:#1d1b19;--mute:#6f6a62;--acc:#2b3dff;--accInk:#fff}
+@media (prefers-color-scheme:dark){:root{--bg:#141311;--surface:#23211e;--ink:#f1ede6;--mute:#9a948a;--acc:#7d8bff;--accInk:#10122e}}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:"Trebuchet MS","Segoe UI",system-ui,sans-serif;min-height:100vh;padding:env(safe-area-inset-top,0px) 0 120px}
+header{padding:20px 18px 8px}
+h1{margin:0 0 12px;font-size:26px;letter-spacing:-.5px}
+input[type=search]{width:100%;padding:13px 16px;border-radius:14px;border:0;background:var(--surface);color:var(--ink);font-size:16px}
+.tog{display:flex;align-items:center;justify-content:space-between;margin:14px 0 4px;font-size:15px}
+.sw{position:relative;width:48px;height:28px;border-radius:14px;background:var(--surface);border:0;cursor:pointer}
+.sw::after{content:"";position:absolute;top:3px;left:3px;width:22px;height:22px;border-radius:50%;background:var(--mute);transition:transform .2s}
+.sw[aria-pressed=true]{background:var(--acc)}
+.sw[aria-pressed=true]::after{transform:translateX(20px);background:var(--accInk)}
+nav{display:flex;gap:8px;padding:6px 18px}
+nav button,.add{border:0;background:var(--surface);color:var(--ink);padding:8px 16px;border-radius:20px;font-size:15px;cursor:pointer}
+nav button.on,.add{background:var(--acc);color:var(--accInk)}
+.add{display:block;margin:12px 18px 0;padding:13px 16px;border-radius:14px;width:calc(100% - 36px);font-size:16px}
+ul{list-style:none;margin:0;padding:6px 10px}
+li{display:flex;align-items:center;gap:12px;padding:10px 8px;border-radius:14px;cursor:pointer}
+li.on{background:var(--surface)}
+.cov{width:50px;height:50px;border-radius:10px;flex:none;background:var(--surface) center/cover;display:flex;align-items:center;justify-content:center;font-size:22px;color:var(--mute)}
+.t{flex:1;min-width:0}
+.t b{display:block;font-size:16px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.t span{font-size:13px;color:var(--mute);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;display:block}
+.e{display:inline!important;font-size:12px;font-weight:700;background:var(--ink);color:var(--bg)!important;border-radius:4px;padding:1px 6px}
+.del{background:none;border:0;color:var(--mute);font-size:20px;padding:8px;cursor:pointer}
+.empty{padding:30px 18px;color:var(--mute);text-align:center}
+.mini{position:fixed;left:10px;right:10px;bottom:calc(10px + env(safe-area-inset-bottom,0px));background:var(--ink);color:var(--bg);border-radius:20px;padding:10px 14px 14px;display:none;align-items:center;gap:10px}
+.mini.show{display:flex}
+.mini .cov{width:44px;height:44px;color:inherit}
+.mini .t span{color:inherit;opacity:.7}
+.mini button{background:none;border:0;color:inherit;font-size:22px;cursor:pointer;padding:6px}
+.bar{position:absolute;left:16px;right:16px;bottom:5px;height:12px;cursor:pointer}
+.bar::before{content:"";position:absolute;left:0;right:0;top:4px;height:3px;border-radius:2px;background:rgba(127,127,127,.35)}
+.bar i{position:absolute;left:0;top:4px;height:3px;width:0;border-radius:2px;background:var(--acc)}
+.note{margin:10px 18px;font-size:13px;color:var(--mute)}
+[hidden]{display:none!important}
+</style>
+</head>
+<body>
+<header>
+<h1>Оригинал</h1>
+<div id="catHead">
+<input id="q" type="search" placeholder="Поиск треков и исполнителей" value="рэп">
+<div class="tog"><span>Только без цензуры</span><button class="sw" id="sw" aria-pressed="true" aria-label="Только без цензуры"></button></div>
+</div>
+</header>
+<nav><button id="n1" class="on">Каталог</button><button id="n2">Моя музыка</button></nav>
+<button class="add" id="add" hidden>Добавить файлы с телефона</button>
+<input type="file" id="file" accept="audio/*" multiple hidden>
+<ul id="list"></ul>
+<p class="note" id="note">В каталоге играют 30-секундные отрывки из открытого каталога Apple.</p>
+<div class="mini" id="mini">
+<div class="cov" id="mc"></div>
+<div class="t"><b id="mt"></b><span id="ma"></span></div>
+<button id="pv" aria-label="Предыдущий">⏮</button>
+<button id="pp" aria-label="Пауза">⏸</button>
+<button id="nx" aria-label="Следующий">⏭</button>
+<div class="bar" id="bar"><i id="pr"></i></div>
+</div>
+<audio id="au"></audio>
+<script>
+var $=function(i){return document.getElementById(i)};
+var au=$("au"),all=[],mine=[],cur=null,tab="cat",only=true,timer=null,seq=0,objUrl=null,db=null;
+
+/* ---- хранилище своих файлов ---- */
+function openDb(){return new Promise(function(ok,no){
+  var r=indexedDB.open("orig",1);
+  r.onupgradeneeded=function(){r.result.createObjectStore("tracks",{keyPath:"id",autoIncrement:true})};
+  r.onsuccess=function(){db=r.result;ok()};r.onerror=function(){no(r.error)}})}
+function store(mode){return db.transaction("tracks",mode).objectStore("tracks")}
+function loadMine(){return new Promise(function(ok){
+  var r=store("readonly").getAll();
+  r.onsuccess=function(){mine=r.result.map(function(x){return{id:x.id,trackName:x.name,artistName:"Моя музыка",blob:x.blob,mine:true}});ok()};
+  r.onerror=function(){ok()}})}
+function saveFile(f){return new Promise(function(ok){
+  var r=store("readwrite").add({name:f.name.replace(/\.[^.]+$/,""),blob:f});
+  r.onsuccess=function(){ok()};r.onerror=function(){ok()}})}
+function removeFile(id){return new Promise(function(ok){
+  var r=store("readwrite").delete(id);r.onsuccess=function(){ok()};r.onerror=function(){ok()}})}
+
+/* ---- список ---- */
+function shown(){
+  if(tab==="my")return mine;
+  return all.filter(function(t){return !only||t.trackExplicitness==="explicit"})}
+
+function cover(el,t){
+  if(t.artworkUrl100){el.style.backgroundImage="url("+t.artworkUrl100+")";el.textContent=""}
+  else{el.style.backgroundImage="none";el.textContent="♪"}}
+
+function draw(){
+  var l=$("list"),v=shown();l.innerHTML="";
+  if(!v.length){var d=document.createElement("div");d.className="empty";
+    d.textContent=tab==="my"?"Здесь пока пусто. Нажми «Добавить файлы» и выбери музыку на телефоне."
+      :(all.length?"Нет треков без цензуры. Выключи фильтр или поищи другое.":"Ничего не найдено");
+    l.appendChild(d);return}
+  v.forEach(function(t){
+    var li=document.createElement("li");if(cur===t)li.className="on";
+    var c=document.createElement("div");c.className="cov";cover(c,t);
+    var w=document.createElement("div");w.className="t";
+    var b=document.createElement("b");b.textContent=t.trackName;
+    var s=document.createElement("span");
+    if(t.trackExplicitness==="explicit"){var e=document.createElement("span");e.className="e";e.textContent="E";s.appendChild(e);s.appendChild(document.createTextNode(" "))}
+    s.appendChild(document.createTextNode(t.artistName));
+    w.appendChild(b);w.appendChild(s);li.appendChild(c);li.appendChild(w);
+    if(t.mine){var x=document.createElement("button");x.className="del";x.textContent="✕";x.setAttribute("aria-label","Удалить");
+      x.onclick=function(e){e.stopPropagation();remove(t)};li.appendChild(x)}
+    li.onclick=function(){start(t)};
+    l.appendChild(li)});
+}
+
+/* ---- плеер ---- */
+function start(t){
+  cur=t;
+  if(objUrl){URL.revokeObjectURL(objUrl);objUrl=null}
+  if(t.mine){objUrl=URL.createObjectURL(t.blob);au.src=objUrl}else{au.src=t.previewUrl}
+  au.play();
+  $("mini").className="mini show";
+  cover($("mc"),t);
+  $("mt").textContent=t.trackName;$("ma").textContent=t.artistName;
+  draw();
+}
+function step(d){
+  var v=shown();if(!v.length)return;
+  var k=v.indexOf(cur);
+  start(v[(k+d+v.length)%v.length]);
+}
+function remove(t){
+  if(cur===t){au.pause();au.removeAttribute("src");cur=null;$("mini").className="mini"}
+  removeFile(t.id).then(loadMine).then(draw);
+}
+
+/* ---- каталог ---- */
+function search(){
+  var term=$("q").value.trim();if(!term)return;
+  var n=++seq;
+  if(tab==="cat")$("list").innerHTML='<div class="empty">Ищу…</div>';
+  fetch("https://itunes.apple.com/search?media=music&entity=song&limit=50&country=RU&term="+encodeURIComponent(term))
+    .then(function(r){return r.json()})
+    .then(function(j){
+      if(n!==seq)return;
+      all=(j.results||[]).filter(function(t){return t.previewUrl});
+      if(tab==="cat")draw();
+    })
+    .catch(function(){
+      if(n!==seq)return;
+      if(tab==="cat")$("list").innerHTML='<div class="empty">Не получилось загрузить. Проверь интернет и попробуй ещё раз.</div>';
+    });
+}
+
+/* ---- вкладки ---- */
+function setTab(t){
+  tab=t;
+  $("n1").className=t==="cat"?"on":"";$("n2").className=t==="my"?"on":"";
+  $("catHead").hidden=t!=="cat";$("add").hidden=t!=="my";
+  $("note").textContent=t==="cat"?"В каталоге играют 30-секундные отрывки из открытого каталога Apple.":"Файлы хранятся только на этом телефоне и играют целиком.";
+  draw();
+}
+$("n1").onclick=function(){setTab("cat")};
+$("n2").onclick=function(){setTab("my")};
+$("add").onclick=function(){$("file").click()};
+$("file").onchange=function(){
+  var fs=Array.prototype.slice.call(this.files);this.value="";
+  if(!fs.length||!db)return;
+  fs.reduce(function(p,f){return p.then(function(){return saveFile(f)})},Promise.resolve())
+    .then(loadMine).then(draw);
+};
+
+$("q").oninput=function(){clearTimeout(timer);timer=setTimeout(search,450)};
+$("sw").onclick=function(){only=!only;this.setAttribute("aria-pressed",only);draw()};
+$("pp").onclick=function(){au.paused?au.play():au.pause()};
+$("nx").onclick=function(){step(1)};
+$("pv").onclick=function(){step(-1)};
+au.onplay=function(){$("pp").textContent="⏸"};
+au.onpause=function(){$("pp").textContent="▶"};
+au.onended=function(){step(1)};
+au.ontimeupdate=function(){if(au.duration)$("pr").style.width=(au.currentTime/au.duration*100)+"%"};
+$("bar").onclick=function(e){var r=this.getBoundingClientRect();if(au.duration)au.currentTime=au.duration*(e.clientX-r.left)/r.width};
+
+try{if(navigator.storage&&navigator.storage.persist)navigator.storage.persist()}catch(e){}
+openDb().then(loadMine).then(function(){if(tab==="my")draw()}).catch(function(){});
+search();
+</script>
+</body>
+</html>
